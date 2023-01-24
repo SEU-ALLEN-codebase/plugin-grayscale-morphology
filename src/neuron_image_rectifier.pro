@@ -33,5 +33,5 @@ SOURCES	+= my_image.cpp argparser.cpp \
     imPreProcess/helpFunc.cpp \
     plugin_actions.cpp
 
-TARGET	= $$qtLibraryTarget(neuron_image_signal_processing)
+TARGET	= $$qtLibraryTarget(neuron_image_rectifier)
 DESTDIR	= D:/Vaa3D/Vaa3D-x.1.1.2_Windows_64bit/plugins/neuron_image_signal_processing/
