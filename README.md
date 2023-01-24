@@ -1,2 +1,2 @@
-# plugin-image-grayscale-morphological-operations
-A plugin for morphological operations, for grayscale, for 16bit.
+# Neuron Image Rectifier
+Preprocessing the neuron image signals to make it benign for reconstruction.
