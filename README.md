@@ -31,6 +31,6 @@ vaa3d -x neuron_image_rectify -f thr_hist_eq -i in.tif -o out.tif out.marker -p 
 # meanshift_soma_refinement
 vaa3d -x neuron_image_rectify -f meanshift_soma_refinement -i in.tif -o out.marker -p start_pos 0.5,0.5,0.5 win_radius 20,20,20 normalized_start true ms_sigma 3,3,3 gsdt true dt_threshold 0 test_count 50 z_thickness 1 connection_type 3
 # integrated
-vaa3d -x neuron_image_rectify -f meanshift_soma_refinement -i in.tif -o out.tif out.marker
+vaa3d -x neuron_image_rectify -f integrated -i in.tif -o out.tif out.marker -p [any parameter above]
 ```
 
