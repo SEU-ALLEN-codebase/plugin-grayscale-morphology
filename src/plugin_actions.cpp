@@ -8,10 +8,10 @@ void IntegratedAction::exec()
     load();
     qDebug() << "High pass filtering..";
     f1(img);
-    qDebug() << "Enhancing..";
-    f3(img);
     qDebug() << "Downsampling..";
     f2(img);
+    qDebug() << "Enhancing..";
+    f3(img);
     qDebug() << "Thresholding..";
     auto&& thr = f4(img);
     qDebug() << "Histogram Equalization..";

@@ -46,7 +46,7 @@ struct Downsampling: public Handler
 
 struct Enhancement: public Handler
 {
-    QVector3D sigma = {1, 1, .25};
+    QVector3D sigma = {1, 1, 1};
     bool bilateral = true, fft = true;
     float color_sigma = 35, gain = 5, cutoff = 25;
     void parse(const ArgParser& parser)
