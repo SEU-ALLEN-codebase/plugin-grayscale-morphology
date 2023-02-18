@@ -17,7 +17,7 @@ struct Handler
 };
 
 
-struct HighPassFilter: public Handler
+struct GaussianHighPassFilter: public Handler
 {
     QVector3D sigma = {8, 8, 2}, skew = {0, 0, -1};
     void parse(const ArgParser& parser)
@@ -26,6 +26,57 @@ struct HighPassFilter: public Handler
         parser.parse("hp_skew", skew);
         for (auto i: {0, 1, 2})
             if (sigma[i] <= 0) throw "HighPassFilter: Sigma must be positive.";
+    }
+    void operator()(MyImage& img) const;
+};
+
+
+struct AdaThreshold: public Handler
+{
+    QVector3D interval = {4, 4, 1};
+    V3DLONG sampling = 3;
+    void parse(const ArgParser& parser)
+    {
+        parser.parse("ada_interval", interval);
+        parser.parse("ada_sampling", sampling);
+        if (sampling <= 0)
+            throw "AdaThreshold: The sampling number must be positive.";
+        for (auto i: {0, 1, 2})
+            if (interval[i] <= 0)
+                throw "AdaThreshold: The sampling interval must be positive.";
+    }
+    void operator()(MyImage& img) const;
+};
+
+
+struct SortFilter: public Handler
+{
+    QVector3D radius = {1, 1, 0};
+    V3DLONG order = 3;
+
+    void parse(const ArgParser& parser)
+    {
+        parser.parse("sort_radius", radius);
+        parser.parse("sort_order", order);
+        if (order < 1)
+            throw "SortFilter: order must be positive.";
+        for (auto i: {0, 1, 2})
+            if (radius[i] < 0) throw "SortFilter: Window radius must not be negative.";
+    }
+    void operator()(MyImage& img) const;
+};
+
+
+struct MorphoThreshold: public Handler
+{
+    QVector3D win = {2, 2, 1};
+    float thr = 0;
+    void parse(const ArgParser& parser)
+    {
+        parser.parse("morpho_win", win);
+        parser.parse("morpho_thr", thr);
+        for (auto i: {0, 1, 2})
+            if (win[i] <= 0) throw "MorphoFilter: window must be positive.";
     }
     void operator()(MyImage& img) const;
 };
@@ -46,7 +97,7 @@ struct Downsampling: public Handler
 
 struct Enhancement: public Handler
 {
-    QVector3D sigma = {1, 1, 1};
+    QVector3D sigma = {1, 1, 0.3};
     bool bilateral = true, fft = true;
     float color_sigma = 35, gain = 5, cutoff = 25;
     void parse(const ArgParser& parser)
@@ -83,7 +134,7 @@ struct SparseAutoThreshold: public Handler
 
 struct ThresholdedHistogramEqualization: public Handler
 {
-    float thr = 0;
+    float thr = 30;
     V3DLONG out_datatype = V3D_UINT8, n_bin_float = 256;
     void parse(const ArgParser& parser)
     {
@@ -99,7 +150,7 @@ struct MeanshiftSomaRefinement: public Handler
 {
     QVector3D start_pos = {.5, .5, .5}, win_radius = {20, 20, 20}, sigma = {3, 3, 3};
     bool normalized_start = true, gsdt = true;
-    float bg_thr = 0, z_thickness = 1;
+    float bg_thr = 0, z_thickness = 4;
     V3DLONG cnn_type = 3, test_count = 50;
     void parse(const ArgParser& parser)
     {

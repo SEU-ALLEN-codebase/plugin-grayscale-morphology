@@ -4,6 +4,9 @@
 #include "imPreProcess/export.h"
 #include "gsdt.h"
 #include "thresholding.h"
+#include "ada_thr.h"
+#include "med_filter.h"
+#include "morpho_op.h"
 
 /// MIT License
 /// by Zuohan Zhao
@@ -13,7 +16,7 @@ using namespace std;
 
 /// the gaussian filtered signal is removed from the original image
 /// but like an adaptive threshold the negative values are rectified
-void HighPassFilter::operator()(MyImage& img) const
+void GaussianHighPassFilter::operator()(MyImage& img) const
 {
     /// fast skewed gaussian filter
     auto blur = img;
@@ -30,13 +33,65 @@ void HighPassFilter::operator()(MyImage& img) const
     case V3D_UINT8: gaussian_filter((v3d_uint8*)src, (v3d_float32*)dst, img.sz, win_sz, sigma, skew); break;
     case V3D_UINT16: gaussian_filter((v3d_uint16*)src, (v3d_float32*)dst, img.sz, win_sz, sigma, skew); break;
     case V3D_FLOAT32: gaussian_filter((v3d_float32*)src, (v3d_float32*)dst, img.sz, win_sz, sigma, skew); break;
-    default: throw "HighPassFilter: Invalid data type for gaussian filter.";
+    default: throw "GaussianHighPassFilter: Invalid data type for gaussian filter.";
     }
 
     /// remove low pass signal from the original image.
     auto&& tot_sz = img.sz[0] * img.sz[1] * img.sz[2];
     for (V3DLONG i = 0; i < tot_sz; ++i)
         img.saturate_set(i, img.at(i) - blur.at(i));
+}
+
+
+void AdaThreshold::operator()(MyImage& img) const
+{
+    auto out = img;
+    out.create();
+    auto&& src = img.data1d.data();
+    auto&& dst = out.data1d.data();
+    V3DLONG h[3] = {max((V3DLONG)interval[0], 1l),
+                    max((V3DLONG)interval[1], 1l),
+                    max((V3DLONG)interval[2], 1l)};
+    switch (img.datatype)
+    {
+    case V3D_UINT8: ada_thr((v3d_uint8*)src, (v3d_uint8*)dst, img.sz, h, sampling); break;
+    case V3D_UINT16: ada_thr((v3d_uint16*)src, (v3d_uint16*)dst, img.sz, h, sampling); break;
+    case V3D_FLOAT32: ada_thr((v3d_float32*)src, (v3d_float32*)dst, img.sz, h, sampling); break;
+    default: throw "AdaThreshold: Invalid data type for gaussian filter.";
+    }
+    img = out;
+}
+
+
+void SortFilter::operator()(MyImage& img) const
+{
+    /// crop
+    auto out = img;
+    out.create();
+    auto&& src = img.data1d.data();
+    auto&& dst = out.data1d.data();
+    switch (img.datatype)
+    {
+    case V3D_UINT8: median_filter((v3d_uint8*)src, (v3d_uint8*)dst, img.sz, radius, order); break;
+    case V3D_UINT16: median_filter((v3d_uint16*)src, (v3d_uint16*)dst, img.sz, radius, order); break;
+    case V3D_FLOAT32: median_filter((v3d_float32*)src, (v3d_float32*)dst, img.sz, radius, order); break;
+    default: throw "SortFilter: Invalid data type.";
+    }
+    img = out;
+}
+
+
+void MorphoThreshold::operator()(MyImage& img) const
+{
+    /// crop
+    auto&& src = img.data1d.data();
+    switch (img.datatype)
+    {
+    case V3D_UINT8: morpho_open((v3d_uint8*)src, img.sz, win, thr); break;
+    case V3D_UINT16: morpho_open((v3d_uint16*)src, img.sz, win, thr); break;
+    case V3D_FLOAT32: morpho_open((v3d_float32*)src, img.sz, win, thr); break;
+    default: throw "MedianFilter: Invalid data type.";
+    }
 }
 
 
@@ -47,6 +102,7 @@ void Downsampling::operator()(MyImage& img) const
     out.sz[0] /= scale[0];
     out.sz[1] /= scale[1];
     out.sz[2] /= scale[2];
+    auto&& vol = scale[0] * scale[1] * scale[2];
     out.create();
     for (V3DLONG x = 0; x < out.sz[0]; ++x)
         for (V3DLONG y = 0; y < out.sz[1]; ++y)
@@ -189,20 +245,19 @@ QVector3D MeanshiftSomaRefinement::operator()(const MyImage& img) const
     if (gsdt)
     {
         auto gsdt = crop;
-        gsdt.datatype = V3D_FLOAT32;
         gsdt.create();
         auto&& src = crop.data1d.data();
-        auto&& dst = (v3d_float32*)gsdt.data1d.data();
+        auto&& dst = gsdt.data1d.data();
         switch (crop.datatype)
         {
         case V3D_UINT8:
-            fastmarching_dt((v3d_uint8*)src, dst, crop.sz, cnn_type, bg_thr, z_thickness);
+            fastmarching_dt((v3d_uint8*)src, (v3d_uint8*)dst, crop.sz, cnn_type, bg_thr, z_thickness);
             break;
         case V3D_UINT16:
-            fastmarching_dt((v3d_uint16*)src, dst, crop.sz, cnn_type, bg_thr, z_thickness);
+            fastmarching_dt((v3d_uint16*)src, (v3d_uint16*)dst, crop.sz, cnn_type, bg_thr, z_thickness);
             break;
         case V3D_FLOAT32:
-            fastmarching_dt((v3d_float32*)src, dst, crop.sz, cnn_type, bg_thr, z_thickness);
+            fastmarching_dt((v3d_float32*)src, (v3d_float32*)dst, crop.sz, cnn_type, bg_thr, z_thickness);
             break;
         default:
             throw "MeanshiftSomaRefinement: Invalid data type.";

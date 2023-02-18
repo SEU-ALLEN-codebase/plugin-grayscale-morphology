@@ -7,21 +7,49 @@
 class IntegratedAction final: public ImageFilterAnnotationAction
 {
 public:
-    HighPassFilter f1;
-    Downsampling f2;
-    Enhancement f3;
-    SparseAutoThreshold f4;
-    ThresholdedHistogramEqualization f5;
-    MeanshiftSomaRefinement f6;
-    void parse() override {ImageFilterAnnotationAction::_parse({&f1, &f2, &f3, &f4, &f5, &f6});}
+    AdaThreshold f1;
+//    Downsampling f2;
+//    Enhancement f3;
+    SparseAutoThreshold f2;
+    ThresholdedHistogramEqualization f3;
+    SortFilter f4;
+    MeanshiftSomaRefinement f5;
+    void parse() override {ImageFilterAnnotationAction::_parse({&f1, &f2, &f3, &f4, &f5});}
     void exec() override;
 };
 
 
-class HighPassFilterAction final: public ImageFilterAction
+class GaussianHighPassFilterAction final: public ImageFilterAction
 {
 public:
-    HighPassFilter f;
+    GaussianHighPassFilter f;
+    void parse() override {ImageFilterAction::_parse({&f});}
+    void exec() override;
+};
+
+
+class MorphoThresholdAction final: public ImageFilterAction
+{
+public:
+    MorphoThreshold f;
+    void parse() override {ImageFilterAction::_parse({&f});}
+    void exec() override;
+};
+
+
+class SortFilterAction final: public ImageFilterAction
+{
+public:
+    SortFilter f;
+    void parse() override {ImageFilterAction::_parse({&f});}
+    void exec() override;
+};
+
+
+class AdaThresholdAction final: public ImageFilterAction
+{
+public:
+    AdaThreshold f;
     void parse() override {ImageFilterAction::_parse({&f});}
     void exec() override;
 };

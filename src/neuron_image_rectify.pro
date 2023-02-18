@@ -10,11 +10,14 @@ QMAKE_CXXFLAGS_RELEASE += -O3       # Release -O3
 
 HEADERS	+= my_image.h argparser.h \
     abstract_actions.h \
+    ada_thr.h \
     gaussian_filter.h \
     gsdt.h \
     handlers.h \
     hist_eq.h \
     imPreProcess/export.h \
+    med_filter.h \
+    morpho_op.h \
     plugin.h \
     imPreProcess/bilateral_filter.h \
     imPreProcess/export.h \

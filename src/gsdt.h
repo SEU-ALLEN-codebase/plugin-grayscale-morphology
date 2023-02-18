@@ -131,7 +131,7 @@ private:
 };
 
 template<class T>
-void fastmarching_dt(T* inimg1d, v3d_float32* dst, const V3DLONG sz[4], int cnn_type, float bkg_thresh, float z_thickness)
+void fastmarching_dt(T* inimg1d, T* dst, const V3DLONG sz[4], int cnn_type, float bkg_thresh, float z_thickness)
 {
     enum {ALIVE = -1, TRIAL = 0, FAR = 1};
 
@@ -187,7 +187,7 @@ void fastmarching_dt(T* inimg1d, v3d_float32* dst, const V3DLONG sz[4], int cnn_
                             {
                                 V3DLONG min_ind = ind;
                                 // get minimum Alive point around ind2
-                                if(dst[min_ind] > 0.0)
+                                if(dst[min_ind] > 0)
                                 {
                                     for(int kkk = -1; kkk <= 1; kkk++)
                                     {
