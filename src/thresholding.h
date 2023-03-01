@@ -1,27 +1,56 @@
 #ifndef THRESHOLDING_H
 #define THRESHOLDING_H
+
 #include <v3d_interface.h>
+#include "stats.hpp"
 
 /// MIT license
 /// by Zuohan Zhao
 
+template <typename T>
+float normal_threshold(const T* const buffer, const V3DLONG size, const float qtl, const float pre_thr)
+{
+    if (qtl < 0 || qtl > 1)
+        throw "Normal threshold: Invalid quantile.";
+    float avg = 0, std = 0;
+    V3DLONG count = 0;
+    for (V3DLONG i = 0; i < size; ++i)
+        if (buffer[i] <= pre_thr)
+        {
+            avg += buffer[i];
+            ++count;
+        }
+    avg /= count;
+    if (count > 1)
+    {
+        for (V3DLONG i = 0; i < size; ++i)
+            if (buffer[i] <= pre_thr)
+            {
+                const auto& d = buffer[i] - avg;
+                std += d*d;
+            }
+        std = sqrt(std / (count - 1));
+    }
+    return stats::qnorm(qtl, avg, std);
+}
+
 
 template <typename T>
-float percentile_threshold(T* buffer, V3DLONG size, float percentile)
+float percentile_threshold(const T* const buffer, const V3DLONG size, const float pct)
 {
-    if (percentile < 0 || percentile > 1)
-        throw "Percentiel threshold: percentile invalid.";
+    if (pct < 0 || pct > 1)
+        throw "Percentile threshold: Invalid percentile.";
     QSharedPointer<T> temp_buffer(new T[size], std::default_delete<T[]>());
     auto&& temp = temp_buffer.data();
     memcpy(temp, buffer, size * sizeof(T));
-    std::sort(temp, temp + size, std::greater<T>());
-    return temp[std::clamp(lround(percentile * size), 0l, size - 1)];
+    std::sort(temp, temp + size);
+    return temp[std::clamp(lround(pct * size), 0l, size - 1)];
 }
 
 
 /// modified from Fiji plugin
 template <typename T>
-float triangle_threshold(T* buffer, V3DLONG size, V3DLONG n_bin, float start_thr)
+float triangle_threshold(const T* const buffer, const V3DLONG size, const V3DLONG n_bin, const float start_thr)
 {
     /// locate grayscale min/max value
     T max = buffer[0], min = buffer[0];

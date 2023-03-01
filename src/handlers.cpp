@@ -4,7 +4,7 @@
 #include "imPreProcess/export.h"
 #include "gsdt.h"
 #include "thresholding.h"
-#include "ada_thr.h"
+#include "ada_denoise.h"
 #include "med_filter.h"
 #include "morpho_op.h"
 
@@ -16,83 +16,114 @@ using namespace std;
 
 /// the gaussian filtered signal is removed from the original image
 /// but like an adaptive threshold the negative values are rectified
-void GaussianHighPassFilter::operator()(MyImage& img) const
+//void GaussianDenoising::operator()(MyImage& img) const
+//{
+//    /// fast skewed gaussian filter
+//    auto blur = img;
+//    blur.datatype = V3D_FLOAT32;
+//    blur.create();
+//    auto&& radius = sigma * 3;
+//    V3DLONG win_sz[3] = {max(lround(radius[0])*2+1, 1l),
+//                         max(lround(radius[1])*2+1, 1l),
+//                         max(lround(radius[2])*2+1, 1l)};
+//    auto&& src = img.data1d.data();
+//    auto&& dst = blur.data1d.data();
+//    switch (img.datatype)
+//    {
+//    case V3D_UINT8: gaussian_filter_skew((v3d_uint8*)src, (v3d_float32*)dst, img.sz, win_sz, sigma, skew); break;
+//    case V3D_UINT16: gaussian_filter_skew((v3d_uint16*)src, (v3d_float32*)dst, img.sz, win_sz, sigma, skew); break;
+//    case V3D_FLOAT32: gaussian_filter_skew((v3d_float32*)src, (v3d_float32*)dst, img.sz, win_sz, sigma, skew); break;
+//    default: throw "GaussianDenoising: Invalid data type for gaussian filter.";
+//    }
+
+//    /// remove low pass signal from the original image.
+//    auto&& tot_sz = img.sz[0] * img.sz[1] * img.sz[2];
+//    for (V3DLONG i = 0; i < tot_sz; ++i)
+//        img.saturate_set(i, img.at(i) - blur.at(i));
+//}
+
+
+
+void GaussianBlurring::operator()(MyImage& img) const
 {
     /// fast skewed gaussian filter
-    auto blur = img;
-    blur.datatype = V3D_FLOAT32;
-    blur.create();
     auto&& radius = sigma * 3;
-    V3DLONG win_sz[3] = {max((V3DLONG)radius[0]*2+1, 1l),
-                         max((V3DLONG)radius[1]*2+1, 1l),
-                         max((V3DLONG)radius[2]*2+1, 1l)};
+    V3DLONG win_sz[3] = {max(lround(radius[0])*2+1, 1l),
+                         max(lround(radius[1])*2+1, 1l),
+                         max(lround(radius[2])*2+1, 1l)};
     auto&& src = img.data1d.data();
-    auto&& dst = blur.data1d.data();
     switch (img.datatype)
     {
-    case V3D_UINT8: gaussian_filter((v3d_uint8*)src, (v3d_float32*)dst, img.sz, win_sz, sigma, skew); break;
-    case V3D_UINT16: gaussian_filter((v3d_uint16*)src, (v3d_float32*)dst, img.sz, win_sz, sigma, skew); break;
-    case V3D_FLOAT32: gaussian_filter((v3d_float32*)src, (v3d_float32*)dst, img.sz, win_sz, sigma, skew); break;
-    default: throw "GaussianHighPassFilter: Invalid data type for gaussian filter.";
+    case V3D_UINT8: gaussian_filter_insitu((v3d_uint8*)src, img.sz, win_sz, sigma); break;
+    case V3D_UINT16: gaussian_filter_insitu((v3d_uint16*)src, img.sz, win_sz, sigma); break;
+    case V3D_FLOAT32: gaussian_filter_insitu((v3d_float32*)src, img.sz, win_sz, sigma); break;
+    default: throw "GaussianBlur: Invalid data type for gaussian filter.";
     }
-
-    /// remove low pass signal from the original image.
-    auto&& tot_sz = img.sz[0] * img.sz[1] * img.sz[2];
-    for (V3DLONG i = 0; i < tot_sz; ++i)
-        img.saturate_set(i, img.at(i) - blur.at(i));
 }
 
 
-void AdaThreshold::operator()(MyImage& img) const
+void DenoisingThreshold::operator()(MyImage& img) const
 {
     auto out = img;
     out.create();
     auto&& src = img.data1d.data();
     auto&& dst = out.data1d.data();
-    V3DLONG h[3] = {max((V3DLONG)interval[0], 1l),
-                    max((V3DLONG)interval[1], 1l),
-                    max((V3DLONG)interval[2], 1l)};
+    V3DLONG h1[3] = {max((V3DLONG)ada_interval[0], 1l),
+                     max((V3DLONG)ada_interval[1], 1l),
+                     max((V3DLONG)ada_interval[2], 1l)};
+    V3DLONG h2[3] = {max((V3DLONG)flare_interval[0], 1l),
+                     max((V3DLONG)flare_interval[1], 1l),
+                     max((V3DLONG)flare_interval[2], 1l)};
     switch (img.datatype)
     {
-    case V3D_UINT8: ada_thr((v3d_uint8*)src, (v3d_uint8*)dst, img.sz, h, sampling); break;
-    case V3D_UINT16: ada_thr((v3d_uint16*)src, (v3d_uint16*)dst, img.sz, h, sampling); break;
-    case V3D_FLOAT32: ada_thr((v3d_float32*)src, (v3d_float32*)dst, img.sz, h, sampling); break;
-    default: throw "AdaThreshold: Invalid data type for gaussian filter.";
+    case V3D_UINT8:
+        ada_denoise((v3d_uint8*)src, (v3d_uint8*)dst, img.sz, h1, ada_sampling,
+                    h2, flare_sampling, flare_weight, atten_depth, flare_x, flare_y);
+        break;
+    case V3D_UINT16:
+        ada_denoise((v3d_uint16*)src, (v3d_uint16*)dst, img.sz, h1, ada_sampling,
+                    h2, flare_sampling, flare_weight, atten_depth, flare_x, flare_y);
+        break;
+    case V3D_FLOAT32:
+        ada_denoise((v3d_float32*)src, (v3d_float32*)dst, img.sz, h1, ada_sampling,
+                    h2, flare_sampling, flare_weight, atten_depth, flare_x, flare_y);
+        break;
+    default: throw "DenoisingThreshold: Invalid data type for gaussian filter.";
     }
     img = out;
 }
 
 
-void SortFilter::operator()(MyImage& img) const
-{
-    /// crop
-    auto out = img;
-    out.create();
-    auto&& src = img.data1d.data();
-    auto&& dst = out.data1d.data();
-    switch (img.datatype)
-    {
-    case V3D_UINT8: median_filter((v3d_uint8*)src, (v3d_uint8*)dst, img.sz, radius, order); break;
-    case V3D_UINT16: median_filter((v3d_uint16*)src, (v3d_uint16*)dst, img.sz, radius, order); break;
-    case V3D_FLOAT32: median_filter((v3d_float32*)src, (v3d_float32*)dst, img.sz, radius, order); break;
-    default: throw "SortFilter: Invalid data type.";
-    }
-    img = out;
-}
+//void MedianFilter::operator()(MyImage& img) const
+//{
+//    /// crop
+//    auto out = img;
+//    out.create();
+//    auto&& src = img.data1d.data();
+//    auto&& dst = out.data1d.data();
+//    switch (img.datatype)
+//    {
+//    case V3D_UINT8: median_filter((v3d_uint8*)src, (v3d_uint8*)dst, img.sz, radius); break;
+//    case V3D_UINT16: median_filter((v3d_uint16*)src, (v3d_uint16*)dst, img.sz, radius); break;
+//    case V3D_FLOAT32: median_filter((v3d_float32*)src, (v3d_float32*)dst, img.sz, radius); break;
+//    default: throw "MedianFilter: Invalid data type.";
+//    }
+//    img = out;
+//}
 
 
-void MorphoThreshold::operator()(MyImage& img) const
-{
-    /// crop
-    auto&& src = img.data1d.data();
-    switch (img.datatype)
-    {
-    case V3D_UINT8: morpho_open((v3d_uint8*)src, img.sz, win, thr); break;
-    case V3D_UINT16: morpho_open((v3d_uint16*)src, img.sz, win, thr); break;
-    case V3D_FLOAT32: morpho_open((v3d_float32*)src, img.sz, win, thr); break;
-    default: throw "MedianFilter: Invalid data type.";
-    }
-}
+//void MorphoThreshold::operator()(MyImage& img) const
+//{
+//    /// crop
+//    auto&& src = img.data1d.data();
+//    switch (img.datatype)
+//    {
+//    case V3D_UINT8: morpho_open((v3d_uint8*)src, img.sz, win, thr); break;
+//    case V3D_UINT16: morpho_open((v3d_uint16*)src, img.sz, win, thr); break;
+//    case V3D_FLOAT32: morpho_open((v3d_float32*)src, img.sz, win, thr); break;
+//    default: throw "MedianFilter: Invalid data type.";
+//    }
+//}
 
 
 /// downsampling to remove breakup and make the image isotropic
@@ -120,7 +151,7 @@ void Downsampling::operator()(MyImage& img) const
 
 
 /// S.Guo's image enhancement workflow
-void Enhancement::operator()(MyImage& img) const
+void GuoEnhancement::operator()(MyImage& img) const
 {
     auto out = img;
     out.create();
@@ -138,7 +169,7 @@ void Enhancement::operator()(MyImage& img) const
                     gain, color_sigma, sigma, bilateral, fft);
         break;
     default:
-        throw "Enhancement: Data type not allowed.";
+        throw "GuoEnhancement: Invalid datatype.";
     }
 
     img = out;
@@ -149,7 +180,34 @@ void Enhancement::operator()(MyImage& img) const
 /// triangle use the percentile's result as the start point, if it's greater than the peak.
 /// neuron's are of very great & diverse intensity, but their volumes are very thin.
 /// this auto thr can remove the background in an explanable and controllable manner.
-float SparseAutoThreshold::operator()(const MyImage& img) const
+//float JointThreshold::operator()(const MyImage& img) const
+//{
+//    float thr;
+//    auto&& tot_sz = img.sz[0] * img.sz[1] * img.sz[2];
+//    auto&& src = img.data1d.data();
+//    switch (img.datatype)
+//    {
+//    case V3D_UINT8:
+//        thr = triangle_threshold((v3d_uint8*)src, tot_sz, 0,
+//                                 percentile_threshold((v3d_uint8*)src, tot_sz, percentile));
+//        break;
+//    case V3D_UINT16:
+//        thr = triangle_threshold((v3d_uint16*)src, tot_sz, 0,
+//                                 percentile_threshold((v3d_uint16*)src, tot_sz, percentile));
+//        break;
+//    case V3D_FLOAT32:
+//        thr = triangle_threshold((v3d_float32*)src, tot_sz, n_bin_float,
+//                                 percentile_threshold((v3d_float32*)src, tot_sz, percentile));
+//        break;
+//    default: throw "PercentileEqualization: Datatype not allowed.";
+//    }
+//    return thr;
+//}
+
+
+/// Estimate a nomral distribution for the histogram of background pixels
+/// and use it to calculate a threshold
+float NormalEstimationThreshold::operator()(const MyImage& img) const
 {
     float thr;
     auto&& tot_sz = img.sz[0] * img.sz[1] * img.sz[2];
@@ -157,57 +215,79 @@ float SparseAutoThreshold::operator()(const MyImage& img) const
     switch (img.datatype)
     {
     case V3D_UINT8:
-        thr = triangle_threshold((v3d_uint8*)src, tot_sz, 0,
-                                 percentile_threshold((v3d_uint8*)src, tot_sz, percentile));
+        thr = percentile_threshold((v3d_uint8*)src, tot_sz, bg_pct);
+        thr = normal_threshold((v3d_uint8*)src, tot_sz, norm_qtl, thr);
         break;
     case V3D_UINT16:
-        thr = triangle_threshold((v3d_uint16*)src, tot_sz, 0,
-                                 percentile_threshold((v3d_uint16*)src, tot_sz, percentile));
+        thr = percentile_threshold((v3d_uint16*)src, tot_sz, bg_pct);
+        thr = normal_threshold((v3d_uint16*)src, tot_sz, norm_qtl, thr);
         break;
     case V3D_FLOAT32:
-        thr = triangle_threshold((v3d_float32*)src, tot_sz, n_bin_float,
-                                 percentile_threshold((v3d_float32*)src, tot_sz, percentile));
+        thr = percentile_threshold((v3d_float32*)src, tot_sz, bg_pct);
+        thr = normal_threshold((v3d_float32*)src, tot_sz, norm_qtl, thr);
         break;
-    default: throw "PercentileEqualization: Datatype not allowed.";
+    default: throw "NormalEstimationThreshold: Invalid datatype.";
     }
     return thr;
 }
 
 
-float ThresholdedHistogramEqualization::operator()(MyImage& img) const
-{
-    auto out = img;
-    out.datatype = out_datatype;
-    out.create();
-    auto&& tot_sz = img.sz[0] * img.sz[1] * img.sz[2];
-    auto&& src = img.data1d.data();
-    float fct;
-    switch (img.datatype)
-    {
-    case V3D_UINT8: thr_hist_eq((v3d_uint8*)src, tot_sz, 0, thr); break;
-    case V3D_UINT16: thr_hist_eq((v3d_uint16*)src, tot_sz, 0, thr); break;
-    case V3D_FLOAT32: thr_hist_eq((v3d_float32*)src, tot_sz, n_bin_float, thr); break;
-    default: throw "ThresholdedHistogramEqualization: Datatype not allowed.";
-    }
-    switch (out.datatype)
-    {
-    case V3D_UINT8: fct = 255; break;
-    case V3D_UINT16: fct = 65535; break;
-    case V3D_FLOAT32: fct = 1; break;
-    default: throw "ThresholdedHistogramEqualization: Datatype not allowed.";
-    }
-    float max = img.at(0), min = img.at(0);
-    for (V3DLONG i = 0; i < tot_sz; ++i)
-    {
-        max = std::max(img.at(i), max);
-        min = std::min(img.at(i), min);
-    }
-    fct /= max - min;
-    for (V3DLONG i = 0; i < tot_sz; ++i)
-        out.saturate_set(i, (img.at(i) - min) * fct);
-    img = out;
-    return (thr - min) * fct;
-}
+//float PercentileThreshold::operator()(const MyImage& img) const
+//{
+//    float thr;
+//    auto&& tot_sz = img.sz[0] * img.sz[1] * img.sz[2];
+//    auto&& src = img.data1d.data();
+//    switch (img.datatype)
+//    {
+//    case V3D_UINT8:
+//        thr = percentile_threshold((v3d_uint8*)src, tot_sz, percentile);
+//        break;
+//    case V3D_UINT16:
+//        thr = percentile_threshold((v3d_uint16*)src, tot_sz, percentile);
+//        break;
+//    case V3D_FLOAT32:
+//        thr = percentile_threshold((v3d_float32*)src, tot_sz, percentile);
+//        break;
+//    default: throw "PercentileThreshold: Invalid datatype.";
+//    }
+//    return thr;
+//}
+
+
+//float HistogramEqualization::operator()(MyImage& img) const
+//{
+//    auto out = img;
+//    out.datatype = out_datatype;
+//    out.create();
+//    auto&& tot_sz = img.sz[0] * img.sz[1] * img.sz[2];
+//    auto&& src = img.data1d.data();
+//    float fct;
+//    switch (img.datatype)
+//    {
+//    case V3D_UINT8: thr_hist_eq((v3d_uint8*)src, tot_sz, 0, thr); break;
+//    case V3D_UINT16: thr_hist_eq((v3d_uint16*)src, tot_sz, 0, thr); break;
+//    case V3D_FLOAT32: thr_hist_eq((v3d_float32*)src, tot_sz, n_bin_float, thr); break;
+//    default: throw "HistogramEqualization: Invalid datatype.";
+//    }
+//    switch (out.datatype)
+//    {
+//    case V3D_UINT8: fct = 255; break;
+//    case V3D_UINT16: fct = 65535; break;
+//    case V3D_FLOAT32: fct = 1; break;
+//    default: throw "HistogramEqualization: Invalid datatype.";
+//    }
+//    float max = img.at(0), min = img.at(0);
+//    for (V3DLONG i = 0; i < tot_sz; ++i)
+//    {
+//        max = std::max(img.at(i), max);
+//        min = std::min(img.at(i), min);
+//    }
+//    fct /= max - min;
+//    for (V3DLONG i = 0; i < tot_sz; ++i)
+//        out.saturate_set(i, (img.at(i) - min) * fct);
+//    img = out;
+//    return (thr - min) * fct;
+//}
 
 
 /// Modified from v3d_plugin mean_shift_center by Yujie Li
@@ -260,7 +340,7 @@ QVector3D MeanshiftSomaRefinement::operator()(const MyImage& img) const
             fastmarching_dt((v3d_float32*)src, (v3d_float32*)dst, crop.sz, cnn_type, bg_thr, z_thickness);
             break;
         default:
-            throw "MeanshiftSomaRefinement: Invalid data type.";
+            throw "MeanshiftSomaRefinement: Invalid datatype.";
         }
         crop = gsdt;
     }
@@ -301,7 +381,8 @@ QVector3D MeanshiftSomaRefinement::operator()(const MyImage& img) const
                 }
         if (total.length() < 1e-5)
         {
-            qDebug() << "Sphere surrounding the marker is zero. Mean-shift cannot happen. Marker location will not move.";
+            qDebug() << "Sphere surrounding the marker is zero. Mean-shift cannot happen. "
+                        "Marker location will not move.";
             return init;
         }
         auto&& new_center = total / weight;

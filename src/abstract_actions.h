@@ -26,24 +26,29 @@ public:
     virtual void exec() = 0;
     virtual void parse() {};
     virtual void dialog() {};
+    int banner_len = 50;
 
 protected:
-    virtual void _flag_start(const char* title, int wing_len = 10)
+    virtual void _flag_start(const char* title)
     {
-        auto wing = qPrintable(QString(wing_len, '<'));
+        auto wing = qPrintable(QString((banner_len - strlen(title) - 2) / 2, '<'));
         qDebug() << "";
-        qDebug() << wing << ' ' << title << ' ' << wing;
-        qDebug() << "";
+        qDebug() << wing << title << wing;
     }
     virtual void _flag_end()
     {
+        auto wing = qPrintable(QString((banner_len - 6) / 2, '<'));
         qDebug() << "";
-        qDebug() << "Done.";
-        qDebug() << "";
+        qDebug() << wing << "DONE" << wing;
+    }
+    virtual void _step(const char* title)
+    {
+        auto suffix = qPrintable(QString(banner_len - strlen(title) - 3, '='));
+        qDebug() << "\n>" << title << suffix;
     }
     virtual ArgParser _parse(std::initializer_list<Handler*> handlers)
     {
-        qDebug() << "Parsing input parameters..";
+        qDebug() << "\n> PARSE INPUT ARGUMENTS";
         auto parser = ArgParser(*input, *output);
         for (auto h: handlers) h->parse(parser);
         return parser;
@@ -58,7 +63,7 @@ public:
     MyImage img;
     virtual void load()
     {
-        qDebug() << "Loading the image..";
+        _step("LOAD IMAGE");
         img.load(img_in, *callback);
     }
 
@@ -78,7 +83,7 @@ public:
     QString img_out;
     virtual void save()
     {
-        qDebug() << "Saving the image..";
+        _step("SAVE IMAGE");
         img.save(img_out, *callback);
     }
 
@@ -99,7 +104,7 @@ public:
     QList<LocationSimple> marker_list;
     virtual void save()
     {
-        qDebug() << "Saving the annotation..";
+        _step("SAVE ANNOTATION");
         export_marker(marker_out, marker_list);
     }
 

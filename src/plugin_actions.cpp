@@ -4,129 +4,103 @@
 
 void IntegratedAction::exec()
 {
-    _flag_start("Integrated Neuron Image Processing");
+    _flag_start("NEURON IMAGE DENOISE");
+    parse();
     load();
-    qDebug() << "Adaptive Thresholding..";
+    _step("1. BACKGROUND AND FLARE DENOISE");
     f1(img);
-//    qDebug() << "Downsampling..";
-//    f2(img);
-//    qDebug() << "Enhancing..";
-//    f3(img);
-    qDebug() << "Thresholding..";
-    auto&& thr = f2(img);
-    qDebug() << "Histogram Equalization..";
-    f3.thr = thr;
-    thr = f3(img);
-    qDebug() << "Sort Filtering..";
-    f4(img);
-    qDebug() << "Refining soma..";
+    _step("2. GAUSSIAN BLUR");
+    f2(img);
+    _step("3. DOWNSAMPLE");
+    f3(img);
+    _step("4. NORMAL ESTIMATION THRESHOLD");
+    const auto& thr = f4(img);
+    _step("5. MEANSHIFT SOMA REFINE");
     f5.bg_thr = thr;
-    auto&& soma = f5(img);
+    const auto& soma = f5(img);
     marker_list.clear();
     marker_list.append({soma[0], soma[1], soma[2]});
-    marker_list.back().name = "refined_soma_with_thr";
+    marker_list.back().name = "soma&thr";
     marker_list.back().comments = std::to_string(lround(thr));
     save();
     _flag_end();
 }
 
 
-void GaussianHighPassFilterAction::exec()
+void BlurAction::exec()
 {
-    _flag_start("High Pass Filtering");
+    _flag_start("NEURON IMAGE DENOISE");
+    parse();
     load();
+    _step("GAUSSIAN BLUR");
     f(img);
     save();
     _flag_end();
 }
 
 
-void MorphoThresholdAction::exec()
+void DenoiseAction::exec()
 {
-    _flag_start("Morphological Thresholding");
+    _flag_start("NEURON IMAGE DENOISE");
+    parse();
     load();
+    _step("BACKGROUND AND FLARE DENOISE");
     f(img);
     save();
     _flag_end();
 }
 
 
-void SortFilterAction::exec()
+void DownsampleAction::exec()
 {
-    _flag_start("Median Filtering");
+    _flag_start("NEURON IMAGE DENOISE");
+    parse();
     load();
+    _step("DOWNSAMPLE");
     f(img);
     save();
     _flag_end();
 }
 
 
-void AdaThresholdAction::exec()
+void GuoEnhAction::exec()
 {
-    _flag_start("Adaptive Thresholding");
+    _flag_start("");
+    parse();
     load();
+    _step("IMAGE ENHANCE");
     f(img);
     save();
     _flag_end();
 }
 
 
-void DownsamplingAction::exec()
+void AutoThrAction::exec()
 {
-    _flag_start("Downsampling");
+    _flag_start("NEURON IMAGE DENOISE");
+    parse();
     load();
-    f(img);
-    save();
-    _flag_end();
-}
-
-
-void EnhancementAction::exec()
-{
-    _flag_start("Enhancement");
-    load();
-    f(img);
-    save();
-    _flag_end();
-}
-
-
-void SparseAutoThresholdAction::exec()
-{
-    _flag_start("Sparse Auto Thresholding");
-    load();
+    _step("NORMAL ESTIMATION THRESHOLD");
     auto&& thr = f(img);
     marker_list.clear();
     marker_list.append({0, 0, 0});
-    marker_list.back().name = "threshold";
+    marker_list.back().name = "thr";
     marker_list.back().comments = std::to_string(lround(thr));
     save();
     _flag_end();
 }
 
 
-void ThresholdedHistogramEqualizationAction::exec()
+void SomaRefineAction::exec()
 {
-    _flag_start("Thresholded Histogram Equalization");
+    _flag_start("NEURON IMAGE DENOISE");
+    parse();
     load();
-    auto&& thr = f(img);
-    marker_list.clear();
-    marker_list.append({0, 0, 0});
-    marker_list.back().name = "histeq_threshold";
-    marker_list.back().comments = std::to_string(lround(thr));
-    save();
-    _flag_end();
-}
-
-
-void MeanshiftSomaRefinementAction::exec()
-{
-    _flag_start("Meanshift Soma Refinement");
-    load();
+    _step("MEANSHIFT SOMA REFINE");
     auto&& soma = f(img);
     marker_list.clear();
     marker_list.append({soma[0], soma[1], soma[2]});
-    marker_list.back().name = "refined_soma";
+    marker_list.back().name = "soma";
     save();
     _flag_end();
 }

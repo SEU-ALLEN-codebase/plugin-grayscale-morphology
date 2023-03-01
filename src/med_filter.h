@@ -7,7 +7,7 @@
 template <class T> void median_filter(T* data1d,
                                       T* outimg,
                                       V3DLONG in_sz[4],
-                                      QVector3D radius, V3DLONG order)
+                                      QVector3D radius)
 {
 
     auto N = in_sz[0], M = in_sz[1], P = in_sz[2];
@@ -69,7 +69,7 @@ template <class T> void median_filter(T* data1d,
                     }
                 }
                 V3DLONG index_pim = offsetk + offsetj + ix;
-                outimg[index_pim] = arr[size - order];
+                outimg[index_pim] = arr[int(0.5*ii)+1];
             }
         }
     }

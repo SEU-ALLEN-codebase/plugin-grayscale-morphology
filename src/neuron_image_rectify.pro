@@ -10,7 +10,7 @@ QMAKE_CXXFLAGS_RELEASE += -O3       # Release -O3
 
 HEADERS	+= my_image.h argparser.h \
     abstract_actions.h \
-    ada_thr.h \
+    ada_denoise.h \
     gaussian_filter.h \
     gsdt.h \
     handlers.h \
@@ -36,5 +36,5 @@ SOURCES	+= my_image.cpp argparser.cpp \
     imPreProcess/helpFunc.cpp \
     plugin_actions.cpp
 
-TARGET	= $$qtLibraryTarget(neuron_image_rectify)
-DESTDIR	= D:/Vaa3D/Vaa3D-x.1.1.2_Windows_64bit/plugins/neuron_image_signal_processing/
+TARGET	= $$qtLibraryTarget(neuron_image_denoise)
+DESTDIR	= D:/Vaa3D/Vaa3D-x.1.1.2_Windows_64bit/plugins/image_analysis/

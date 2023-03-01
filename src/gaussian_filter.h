@@ -12,92 +12,234 @@
 
 
 template <class T>
-void gaussian_filter(T* data1d,
-                     v3d_float32* dst,
-                     V3DLONG in_sz[4],
-                     const V3DLONG win_sz[3],
-                     const QVector3D& sigma,
-                     const QVector3D& skew)
+void gaussian_filter_skew(const T* src,
+                          v3d_float32* const dst,
+                          const V3DLONG in_sz[4],
+                          const V3DLONG win_sz[3],
+                          const QVector3D& sigma,
+                          const QVector3D& skew = {0, 0, 0})
 {
-    if (!data1d || !in_sz || in_sz[0]<=0 || in_sz[1]<=0 || in_sz[2]<=0 || in_sz[3]<=0 || !dst)
-        throw "High pass filter: Invalid parameters to gaussian_filter.";
+    if (!src || !in_sz || in_sz[0]<=0 || in_sz[1]<=0 || in_sz[2]<=0 || in_sz[3]<=0 || !dst)
+        throw "Gaussian Filter: Invalid parameters to gaussian_filter.";
 
-    auto&& pagesz = in_sz[0] * in_sz[1] * in_sz[2];
+    // copy
+    {
+        const auto pagesz = in_sz[0] * in_sz[1] * in_sz[2];
+        for (V3DLONG i = 0; i < pagesz; ++i) dst[i] = src[i];
+    }
 
-    /// copy
-    for(V3DLONG i = 0; i < pagesz; ++i) dst[i] = data1d[i];
-
-    /// filter
-    /// iterate through x, y, z
+    // filter
+    // iterate through x, y, z
+    V3DLONG sz[5] = {in_sz[0], in_sz[1], in_sz[2], in_sz[0], in_sz[1]};
+    V3DLONG stride[5] = {1, in_sz[0], in_sz[0]*in_sz[1], 1, in_sz[0]};
     for (auto dim: {0, 1, 2})
     {
-        if (in_sz[dim] < 2)
+        if (sz[dim] < 2)
             continue;
 
-        /// allocate skewed gaussian distribution 1D
+        // allocate skewed gaussian distribution 1D
         QSharedPointer<float> weights_buffer(new float[win_sz[dim]], std::default_delete<float[]>());
         if (weights_buffer.isNull())
-            throw "High pass filter: Memory allocation failed in gaussian filter.";
-        auto&& weights = weights_buffer.data();
-        auto&& half = (win_sz[dim]-1) / 2;
-        for (V3DLONG i = 0; i <= half; ++i)
+            throw "Gaussian Filter: Memory allocation failed in gaussian filter.";
+        const auto weights = weights_buffer.data();
         {
-            auto&& j = i - half;
-            weights[i] = weights[win_sz[dim]-i-1] =
-                    2 * stats::dnorm(j, 0, sigma[dim]) * stats::pnorm(skew[dim] * j, 0, sigma[dim]);
+            const auto half = (win_sz[dim] - 1) / 2;
+            for (V3DLONG i = 0; i <= half; ++i)
+                weights[i] = weights[win_sz[dim]-i-1] = stats::dnorm(i - half, 0, sigma[dim]);
+            float k = 0;
+            for (V3DLONG i = 0; i < win_sz[dim]; ++i)
+            {
+                weights[i] *= stats::pnorm(skew[dim] * (i - half), 0, sigma[dim]);
+                k += weights[i];
+            }
+            if (dim == 0)
+                printf("X direction\n");
+            else if (dim == 1)
+                printf("Y direction\n");
+            else
+                printf("Z direction\n");
+            for (V3DLONG i = 0; i < win_sz[dim]; ++i)
+            {
+                weights[i] /= k;
+                printf("%f\t", weights[i]);
+                if ((i + 1) % 5 == 0 && i < win_sz[dim] - 1) printf("\n");
+            }
+            printf("\n");
         }
 
-        /// temp buffer of raw image in 1D
-        /// out-of-range parts are reflected padding
-        QSharedPointer<float> extension_buffer(new float[in_sz[dim] + win_sz[dim] * 2], std::default_delete<float[]>());
+        // temp buffer of raw image in 1D
+        // out-of-range parts are reflected padding
+        QSharedPointer<float> extension_buffer(new float[sz[dim] + win_sz[dim] * 2], std::default_delete<float[]>());
         if (extension_buffer.isNull())
-            throw "High pass filter: Memory allocation failed in gaussian filter.";
-        auto&& extension = extension_buffer.data();
+            throw "Gaussian Filter: Memory allocation failed in gaussian filter.";
+        const auto extension = extension_buffer.data();
+        const auto offset = win_sz[dim] / 2;
+        const auto ext_stop = extension + sz[dim] + offset;
 
-        auto&& offset = win_sz[dim] / 2;
-        auto&& extStop = extension + in_sz[dim] + offset;
-        auto&& dim1 = (dim + 1) % 3;
-        auto&& dim2 = (dim + 2) % 3;
-        auto index = [&](QList<V3DLONG> ind) {
-            return in_sz[0]*in_sz[1]*ind[dim] + in_sz[0]*ind[dim1] + ind[dim2];
-        };
-
-        for (V3DLONG i = 0; i < in_sz[dim2]; ++i)
-            for (V3DLONG j = 0; j < in_sz[dim1]; ++j)
+        for (V3DLONG i = 0, buf_start1 = 0;
+             i < sz[dim + 2];
+             ++i, buf_start1 += stride[dim + 2])
+        {
+            for (V3DLONG j = 0, buf_start2 = buf_start1;
+                 j < sz[dim + 1];
+                 ++j, buf_start2 += stride[dim + 1])
             {
-                auto extIter = extension + win_sz[dim];
-                for(V3DLONG k = 0; k < in_sz[dim]; ++k)
-                    *(extIter++) = dst[index({i, j, k})];
-
-                ///   Extend image
-                auto&& stop_line = extension - 1;
-                auto extLeft = extension + win_sz[dim] - 1;
-                auto arrLeft = extLeft + 2;
-                auto extRight = extLeft + in_sz[dim] + 1;
-                auto arrRight = extRight - 2;
-
-                while (extLeft > stop_line)
+                // copy the buffer along the dim
                 {
-                    *(extLeft--) = *(arrLeft++);
-                    *(extRight++) = *(arrRight--);
-
+                    auto&& ext_ptr = extension + win_sz[dim];
+                    auto&& res_ptr = dst + buf_start2;
+                    for(V3DLONG k = 0; k < sz[dim]; ++k)
+                    {
+                        *(ext_ptr++) = *res_ptr;
+                        res_ptr += stride[dim];
+                    }
                 }
-                ///	Filtering
-                extIter = extension + offset;
-                auto resIter = dst + index({i, j, 0});
-                while (extIter < extStop)
-                {
-                    double sum = 0.;
-                    auto weightIter = weights;
-                    auto&& End = weights + win_sz[dim];
-                    auto arrIter = extIter;
-                    while (weightIter < End)
-                        sum += *(weightIter++) * float(*(arrIter++));
-                    extIter++;
-                    *(resIter++) = sum;
 
+                // extend image
+                {
+                    auto&& ext_l = extension + win_sz[dim] - 1;
+                    auto&& arr_l = ext_l + 2;
+                    auto&& ext_r = ext_l + sz[dim] + 1;
+                    auto&& arr_r = ext_r - 2;
+                    while (ext_l >= extension)
+                    {
+                        *(ext_l--) = *(arr_l++);
+                        *(ext_r++) = *(arr_r--);
+                    }
+                }
+
+                //	filtering and copy back
+                {
+                    auto&& ext_ptr = extension + offset;
+                    auto&& res_ptr = dst + buf_start2;
+                    while (ext_ptr < ext_stop)
+                    {
+                        float sum = 0;
+                        auto w_ptr = weights;
+                        auto arrIter = ext_ptr;
+                        auto&& w_end = weights + win_sz[dim];
+                        while (w_ptr < w_end)
+                            sum += *(w_ptr++) * *(arrIter++);
+                        ++ext_ptr;
+                        *res_ptr = sum;
+                        res_ptr += stride[dim];
+                    }
                 }
             }
+            printf("\r%d %% completed..", ((i + 1)*100) / sz[dim + 2]); fflush(stdout);
+        }
+        printf("\n");
+    }
+}
+
+
+template <class T>
+void gaussian_filter_insitu(T* const src,
+                             const V3DLONG in_sz[4],
+                             const V3DLONG win_sz[3],
+                             const QVector3D& sigma)
+{
+    if (!src || !in_sz || in_sz[0]<=0 || in_sz[1]<=0 || in_sz[2]<=0 || in_sz[3]<=0)
+        throw "Gaussian Filter: Invalid parameters to gaussian_filter.";
+
+    // filter
+    // iterate through x, y, z
+    V3DLONG sz[5] = {in_sz[0], in_sz[1], in_sz[2], in_sz[0], in_sz[1]};
+    V3DLONG stride[5] = {1, in_sz[0], in_sz[0]*in_sz[1], 1, in_sz[0]};
+    for (auto dim: {0, 1, 2})
+    {
+        if (sz[dim] < 2)
+            continue;
+
+        // allocate gaussian distribution 1D
+        QSharedPointer<float> weights_buffer(new float[win_sz[dim]], std::default_delete<float[]>());
+        if (weights_buffer.isNull())
+            throw "Gaussian Filter: Memory allocation failed in gaussian filter.";
+        const auto weights = weights_buffer.data();
+        {
+            const auto half = (win_sz[dim] - 1) / 2;
+            for (V3DLONG i = 0; i <= half; ++i)
+                weights[i] = weights[win_sz[dim]-i-1] = stats::dnorm(i - half, 0, sigma[dim]);
+            float k = 0;
+            for (V3DLONG i = 0; i < win_sz[dim]; ++i)
+                k += weights[i];
+            if (dim == 0)
+                printf("X direction\n");
+            else if (dim == 1)
+                printf("Y direction\n");
+            else
+                printf("Z direction\n");
+            for (V3DLONG i = 0; i < win_sz[dim]; ++i)
+            {
+                weights[i] /= k;
+                printf("%f\t", weights[i]);
+                if ((i + 1) % 5 == 0 && i < win_sz[dim] - 1) printf("\n");
+            }
+            printf("\n");
+        }
+
+        // temp buffer of raw image in 1D
+        // out-of-range parts are reflected padding
+        QSharedPointer<float> extension_buffer(new float[sz[dim] + win_sz[dim] * 2], std::default_delete<float[]>());
+        if (extension_buffer.isNull())
+            throw "Gaussian Filter: Memory allocation failed in gaussian filter.";
+        const auto extension = extension_buffer.data();
+        const auto offset = win_sz[dim] / 2;
+        const auto ext_stop = extension + sz[dim] + offset;
+
+        for (V3DLONG i = 0, buf_start1 = 0;
+             i < sz[dim + 2];
+             ++i, buf_start1 += stride[dim + 2])
+        {
+            for (V3DLONG j = 0, buf_start2 = buf_start1;
+                 j < sz[dim + 1];
+                 ++j, buf_start2 += stride[dim + 1])
+            {
+                // copy the buffer along the dim
+                {
+                    auto&& ext_ptr = extension + win_sz[dim];
+                    auto&& res_ptr = src + buf_start2;
+                    for(V3DLONG k = 0; k < sz[dim]; ++k)
+                    {
+                        *(ext_ptr++) = *res_ptr;
+                        res_ptr += stride[dim];
+                    }
+                }
+
+                // extend image
+                {
+                    auto&& ext_l = extension + win_sz[dim] - 1;
+                    auto&& arr_l = ext_l + 2;
+                    auto&& ext_r = ext_l + sz[dim] + 1;
+                    auto&& arr_r = ext_r - 2;
+                    while (ext_l >= extension)
+                    {
+                        *(ext_l--) = *(arr_l++);
+                        *(ext_r++) = *(arr_r--);
+                    }
+                }
+
+                //	filtering and copy back
+                {
+                    auto&& ext_ptr = extension + offset;
+                    auto&& res_ptr = src + buf_start2;
+                    while (ext_ptr < ext_stop)
+                    {
+                        float sum = 0;
+                        auto w_ptr = weights;
+                        auto arrIter = ext_ptr;
+                        auto&& w_end = weights + win_sz[dim];
+                        while (w_ptr < w_end)
+                            sum += *(w_ptr++) * *(arrIter++);
+                        ++ext_ptr;
+                        *res_ptr = sum;
+                        res_ptr += stride[dim];
+                    }
+                }
+            }
+            printf("\r%d %% completed..", ((i + 1)*100) / sz[dim + 2]); fflush(stdout);
+        }
+        printf("\n");
     }
 }
 
