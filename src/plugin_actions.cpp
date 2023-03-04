@@ -13,15 +13,11 @@ void IntegratedAction::exec()
     f2(img);
     _step("3. DOWNSAMPLE");
     f3(img);
-    _step("4. NORMAL ESTIMATION THRESHOLD");
-    const auto& thr = f4(img);
-    _step("5. MEANSHIFT SOMA REFINE");
-    f5.bg_thr = thr;
-    const auto& soma = f5(img);
+    _step("4. MEANSHIFT SOMA REFINE");
+    const auto& soma = f4(img);
     marker_list.clear();
     marker_list.append({soma[0], soma[1], soma[2]});
-    marker_list.back().name = "soma&thr";
-    marker_list.back().comments = std::to_string(lround(thr));
+    marker_list.back().name = "soma";
     save();
     _flag_end();
 }
@@ -70,22 +66,6 @@ void GuoEnhAction::exec()
     load();
     _step("IMAGE ENHANCE");
     f(img);
-    save();
-    _flag_end();
-}
-
-
-void AutoThrAction::exec()
-{
-    _flag_start("NEURON IMAGE DENOISE");
-    parse();
-    load();
-    _step("NORMAL ESTIMATION THRESHOLD");
-    auto&& thr = f(img);
-    marker_list.clear();
-    marker_list.append({0, 0, 0});
-    marker_list.back().name = "thr";
-    marker_list.back().comments = std::to_string(lround(thr));
     save();
     _flag_end();
 }

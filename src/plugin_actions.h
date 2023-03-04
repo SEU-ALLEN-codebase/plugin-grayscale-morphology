@@ -10,9 +10,8 @@ public:
     DenoisingThreshold f1;
     GaussianBlurring f2;
     Downsampling f3;
-    NormalEstimationThreshold f4;
-    MeanshiftSomaRefinement f5;
-    void parse() override {ImageFilterAnnotationAction::_parse({&f1, &f2, &f3, &f4, &f5});}
+    MeanshiftSomaRefinement f4;
+    void parse() override {ImageFilterAnnotationAction::_parse({&f1, &f2, &f3, &f4});}
     void exec() override;
 };
 
@@ -49,15 +48,6 @@ class GuoEnhAction final: public ImageFilterAction
 public:
     GuoEnhancement f;
     void parse() override {ImageFilterAction::_parse({&f});}
-    void exec() override;
-};
-
-
-class AutoThrAction final: public ImageAnnotationAction
-{
-public:
-    NormalEstimationThreshold f;
-    void parse() override {ImageAnnotationAction::_parse({&f});}
     void exec() override;
 };
 

@@ -1,7 +1,7 @@
 TEMPLATE	= lib
 CONFIG	+= qt plugin warn_off
 QT	+= widgets
-VAA3DPATH = D:\Vaa3D\v3d_external_QT6
+VAA3DPATH = D:\Vaa3D\v3d_external
 INCLUDEPATH	+= $$VAA3DPATH/v3d_main/basic_c_fun
 INCLUDEPATH += ../3rdparty/gcem/include
 INCLUDEPATH += ../3rdparty/stats/include
