@@ -202,31 +202,17 @@ struct NormalEstimationThreshold: public Handler
 //};
 
 
-struct MeanshiftSomaRefinement: public Handler
+struct SomaSearch: public Handler
 {
-    QVector3D start_pos = {.5, .5, .5}, win_radius = {20, 20, 20}, sigma = {3, 3, 3};
-    bool normalized_start = true, gsdt = true;
+    QVector3D win_radius = {15, 15, 15};
     float bg_thr = 0, z_thickness = 1;
-    V3DLONG cnn_type = 3, test_count = 50;
+    V3DLONG cnn_type = 3, test_count = 10;
     void parse(const ArgParser& parser)
     {
-        parser.parse("normalized_start", normalized_start);
-        parser.parse("start_pos", start_pos);
-        for (auto i: {0, 1, 2})
-            if (start_pos[i] < 0 || start_pos[i] > 1)
-                throw "MeanshiftSomaRefinement: Soma start position must be within 0~1.";
-
         parser.parse("win_radius", win_radius);
         for (auto i: {0, 1, 2})
             if (win_radius[i] <= 0)
-                throw "MeanshiftSomaRefinement: Meanshift window radius must be positive.";
-
-        parser.parse("ms_sigma", sigma);
-        for (auto i: {0, 1, 2})
-            if (sigma[i] <= 0)
                 throw "MeanshiftSomaRefinement: Meanshift search radius must be positive.";
-
-        parser.parse("gsdt", gsdt);
         parser.parse("dt_threshold", bg_thr);
         parser.parse("test_count", test_count);
         parser.parse("z_thickness", z_thickness);
@@ -236,7 +222,7 @@ struct MeanshiftSomaRefinement: public Handler
         if (cnn_type < 1 || cnn_type > 3)
             throw "MeanshiftSomaRefinement: Connection type can only be 1, 2 or 3.";
     }
-    QVector3D operator()(const MyImage& img) const;
+    void operator()(const MyImage& img, QVector3D& soma) const;
 };
 
 

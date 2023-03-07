@@ -135,7 +135,7 @@ void MyImage::create(char flag)
 }
 
 
-MyImage MyImage::as_type(int newtype, float scale, bool saturate) const
+MyImage MyImage::as_type(ImagePixelType newtype, float scale, bool saturate) const
 {
     auto out = *this;
     out.datatype = newtype;
@@ -155,8 +155,10 @@ MyImage MyImage::as_type(int newtype, float scale, bool saturate) const
 void MyImage::load(const QString& path, V3DPluginCallback2& cb)
 {
     v3d_uint8* p = nullptr;
-    if(!simple_loadimage_wrapper(cb, path.toStdString().c_str(), p, sz, datatype))
+    int dt;
+    if(!simple_loadimage_wrapper(cb, path.toStdString().c_str(), p, sz, dt))
         throw "MyImage: Loading image failed.";
+    datatype = ImagePixelType(dt);
     data1d = QSharedPointer<byte>((byte*)p, default_delete<byte[]>());
 }
 
@@ -165,6 +167,21 @@ void MyImage::save(const QString& path, V3DPluginCallback2& cb)
     if (!simple_saveimage_wrapper(cb, path.toStdString().c_str(),
                                   (v3d_uint8*)data1d.data(), sz, datatype))
         throw "MyImage: Saving image failed.";
+}
+
+
+void MyImage::assign(const Image4DSimple& img)
+{
+    const auto& totalbytes = img.getTotalBytes();
+    data1d = QSharedPointer<byte>(new byte[totalbytes], default_delete<byte[]>());
+    memcpy(data1d.data(), img.getRawData(), totalbytes);
+    if (data1d.isNull())
+        throw "MyImage: Memory allocation failed.";
+    sz[0] = img.getXDim();
+    sz[1] = img.getYDim();
+    sz[2] = img.getZDim();
+    sz[3] = img.getCDim();
+    datatype = img.getDatatype();
 }
 
 

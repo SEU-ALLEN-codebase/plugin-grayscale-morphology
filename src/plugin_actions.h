@@ -4,58 +4,109 @@
 #include "abstract_actions.h"
 
 
-class IntegratedAction final: public ImageFilterAnnotationAction
+class IntegratedFilterAction final: public ImageFilterAction
 {
 public:
+    IntegratedFilterAction()
+    {
+        _flag_start("NEURON IMAGE DENOISE");
+    }
+    ~IntegratedFilterAction()
+    {
+        _flag_end();
+    }
     DenoisingThreshold f1;
     GaussianBlurring f2;
     Downsampling f3;
-    MeanshiftSomaRefinement f4;
-    void parse() override {ImageFilterAnnotationAction::_parse({&f1, &f2, &f3, &f4});}
+    void parse() override {ImageFilterAction::_parse({&f1, &f2, &f3});}
     void exec() override;
+    virtual void dialog();
 };
 
 
 class BlurAction final: public ImageFilterAction
 {
 public:
+    BlurAction()
+    {
+        _flag_start("NEURON IMAGE DENOISE");
+    }
+    ~BlurAction()
+    {
+        _flag_end();
+    }
     GaussianBlurring f;
     void parse() override {ImageFilterAction::_parse({&f});}
     void exec() override;
+    virtual void dialog();
 };
 
 
 class DenoiseAction final: public ImageFilterAction
 {
 public:
+    DenoiseAction()
+    {
+        _flag_start("NEURON IMAGE DENOISE");
+    }
+    ~DenoiseAction()
+    {
+        _flag_end();
+    }
     DenoisingThreshold f;
     void parse() override {ImageFilterAction::_parse({&f});}
     void exec() override;
+    virtual void dialog();
 };
 
 
 class DownsampleAction final: public ImageFilterAction
 {
 public:
+    DownsampleAction()
+    {
+        _flag_start("NEURON IMAGE DENOISE");
+    }
+    ~DownsampleAction()
+    {
+        _flag_end();
+    }
     Downsampling f;
     void parse() override {ImageFilterAction::_parse({&f});}
     void exec() override;
+    virtual void dialog();
 };
 
 
 class GuoEnhAction final: public ImageFilterAction
 {
 public:
+    GuoEnhAction()
+    {
+        _flag_start("NEURON IMAGE DENOISE");
+    }
+    ~GuoEnhAction()
+    {
+        _flag_end();
+    }
     GuoEnhancement f;
     void parse() override {ImageFilterAction::_parse({&f});}
     void exec() override;
 };
 
 
-class SomaRefineAction final: public ImageAnnotationAction
+class SomaSearchAction final: public ImageAnnotationAction
 {
 public:
-    MeanshiftSomaRefinement f;
+    SomaSearchAction()
+    {
+        _flag_start("NEURON IMAGE DENOISE");
+    }
+    ~SomaSearchAction()
+    {
+        _flag_end();
+    }
+    SomaSearch f;
     void parse() override {ImageAnnotationAction::_parse({&f});}
     void exec() override;
 };

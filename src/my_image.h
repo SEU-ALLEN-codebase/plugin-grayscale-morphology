@@ -11,7 +11,7 @@
 struct MyImage
 {
     QSharedPointer<std::byte> data1d;
-    int datatype = V3D_UNKNOWN;
+    ImagePixelType datatype = V3D_UNKNOWN;
     V3DLONG sz[4] = {0, 0, 0, 0};
     enum BorderType { NONE, REPLICATE, REFLECT, WRAP } borderType = BorderType::NONE;
 
@@ -27,10 +27,11 @@ struct MyImage
     void saturate_set(V3DLONG x, V3DLONG y, V3DLONG z, float v);
 
     void create(char flag = 0);
-    MyImage as_type(int newtype, float scale = 1, bool saturate = true) const;
+    MyImage as_type(ImagePixelType newtype, float scale = 1, bool saturate = true) const;
     void load(const QString& path, V3DPluginCallback2& cb);
     void save(const QString& path, V3DPluginCallback2& cb);
     MyImage copy() const;
+    void assign(const Image4DSimple& img);
 };
 
 

@@ -290,104 +290,51 @@ float NormalEstimationThreshold::operator()(const MyImage& img) const
 //}
 
 
-/// Modified from v3d_plugin mean_shift_center by Yujie Li
-/// use a 3D gaussian window so that it tends to center at local maxima
-QVector3D MeanshiftSomaRefinement::operator()(const MyImage& img) const
+void SomaSearch::operator()(const MyImage& img, QVector3D& soma) const
 {
-    QVector3D init(start_pos);
-    if (normalized_start)
-        init *= QVector3D(img.sz[0], img.sz[1], img.sz[2]);
-    V3DLONG win_radius[3] = {min(lround(this->win_radius[0]), img.sz[0]/2),
-                             min(lround(this->win_radius[1]), img.sz[1]/2),
-                             min(lround(this->win_radius[2]), img.sz[2]/2)};
-    V3DLONG start[3] = {lround(init[0]),
-                        lround(init[1]),
-                        lround(init[2])};
-
-    /// crop
-    auto crop = img;
-    for (auto i: {0, 1, 2})
-        crop.sz[i] = win_radius[i] * 2 + 1;
-    crop.create();
-    auto xs = max(0l, start[0] - win_radius[0]);
-    auto ys = max(0l, start[1] - win_radius[1]);
-    auto zs = max(0l, start[2] - win_radius[2]);
-    auto xe = min(start[0] + win_radius[0] + 1, img.sz[0]);
-    auto ye = min(start[1] + win_radius[1] + 1, img.sz[1]);
-    auto ze = min(start[2] + win_radius[2] + 1, img.sz[2]);
-
-    for (V3DLONG x = xs; x < xe; ++x)
-        for (V3DLONG y = ys; y < ye; ++y)
-            for (V3DLONG z = zs; z < ze; ++z)
-                crop.set(x - xs, y - ys, z - zs, img.at(x, y, z));
-
     /// distance transform
-    if (gsdt)
+    auto gsdt = img;
+    gsdt.create();
+    auto&& src = img.data1d.data();
+    auto&& dst = gsdt.data1d.data();
+    switch (img.datatype)
     {
-        auto gsdt = crop;
-        gsdt.create();
-        auto&& src = crop.data1d.data();
-        auto&& dst = gsdt.data1d.data();
-        switch (crop.datatype)
-        {
-        case V3D_UINT8:
-            fastmarching_dt((v3d_uint8*)src, (v3d_uint8*)dst, crop.sz, cnn_type, bg_thr, z_thickness);
-            break;
-        case V3D_UINT16:
-            fastmarching_dt((v3d_uint16*)src, (v3d_uint16*)dst, crop.sz, cnn_type, bg_thr, z_thickness);
-            break;
-        case V3D_FLOAT32:
-            fastmarching_dt((v3d_float32*)src, (v3d_float32*)dst, crop.sz, cnn_type, bg_thr, z_thickness);
-            break;
-        default:
-            throw "MeanshiftSomaRefinement: Invalid datatype.";
-        }
-        crop = gsdt;
+    case V3D_UINT8:
+        fastmarching_dt((v3d_uint8*)src, (v3d_uint8*)dst, img.sz, cnn_type, bg_thr, z_thickness);
+        break;
+    case V3D_UINT16:
+        fastmarching_dt((v3d_uint16*)src, (v3d_uint16*)dst, img.sz, cnn_type, bg_thr, z_thickness);
+        break;
+    case V3D_FLOAT32:
+        fastmarching_dt((v3d_float32*)src, (v3d_float32*)dst, img.sz, cnn_type, bg_thr, z_thickness);
+        break;
+    default:
+        throw "MeanshiftSomaRefinement: Invalid datatype.";
     }
 
-    /// meanshift
-    auto&& center = init - QVector3D(xs, ys, zs);
     V3DLONG count = 0;
     float center_dist = 1;
-    auto&& search_radius = sigma * 3;
-    auto&& s2 = sigma * sigma;
     while (center_dist >= .5 && count < test_count)
     {
-        float weight = 0;
-        QVector3D total = {0, 0, 0};
         ++count;
+        const auto& start = soma - win_radius;
+        const auto& end = soma + win_radius;
+        const auto xs = max(0l, lround(start[0]));
+        const auto ys = max(0l, lround(start[1]));
+        const auto zs = max(0l, lround(start[2]));
+        const auto xe = min(lround(end[0]) + 1, gsdt.sz[0]);
+        const auto ye = min(lround(end[1]) + 1, gsdt.sz[1]);
+        const auto ze = min(lround(end[2]) + 1, gsdt.sz[2]);
 
-        auto&& start = center - search_radius;
-        auto&& end = center + search_radius;
-
-        auto xs = max(0l, lround(start[0]));
-        auto ys = max(0l, lround(start[1]));
-        auto zs = max(0l, lround(start[2]));
-        auto xe = min(lround(end[0]) + 1, crop.sz[0]);
-        auto ye = min(lround(end[1]) + 1, crop.sz[1]);
-        auto ze = min(lround(end[2]) + 1, crop.sz[2]);
-
+        auto new_center = soma;
         for(V3DLONG x = xs; x < xe; ++x)
             for(V3DLONG y = ys; y < ye; ++y)
                 for(V3DLONG z = zs; z < ze; ++z)
                 {
-                    QVector3D coord(x, y, z);
-                    auto&& shift = coord - center;
-                    if ((shift / search_radius).lengthSquared() > 1)
-                        continue;
-                    auto&& w = exp(QVector3D::dotProduct(shift / s2, {.5, .5, .5})) * crop.at(x, y, z);
-                    total += w * coord;
-                    weight += w;
+                    if (gsdt.at(x, y, z) > gsdt.at(new_center[0], new_center[1], new_center[2]))
+                        new_center = QVector3D(x, y, z);
                 }
-        if (total.length() < 1e-5)
-        {
-            qDebug() << "Sphere surrounding the marker is zero. Mean-shift cannot happen. "
-                        "Marker location will not move.";
-            return init;
-        }
-        auto&& new_center = total / weight;
-        center_dist = (new_center - center).length();
-        center = new_center;
+        center_dist = (new_center - soma).length();
+        soma = new_center;
     }
-    return center + QVector3D(xs, ys, zs);
 }

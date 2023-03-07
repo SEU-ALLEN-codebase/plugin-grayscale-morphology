@@ -24,6 +24,8 @@ public:
         this->output = &output;
     }
     virtual void exec() = 0;
+    virtual void load() {};
+    virtual void save() {};
     virtual void parse() {};
     virtual void dialog() {};
     int banner_len = 50;
@@ -100,8 +102,15 @@ protected:
 class ImageAnnotationAction: virtual public ImageAction
 {
 public:
-    QString marker_out;
+    QString marker_in, marker_out;
     QList<LocationSimple> marker_list;
+    virtual void load()
+    {
+        ImageAction::load();
+        _step("LOAD ANNOTATION");
+        marker_list = import_marker(marker_in);
+        qDebug() << "Successfully loaded" << marker_list.size() << "markers.";
+    }
     virtual void save()
     {
         _step("SAVE ANNOTATION");
@@ -112,32 +121,33 @@ protected:
     ArgParser _parse(std::initializer_list<Handler*> handlers) override
     {
         auto parser = ImageAction::_parse(handlers);
+        marker_in = parser.input(1);
         marker_out = parser.output(0);
         return parser;
     }
 };
 
 
-class ImageFilterAnnotationAction: public ImageFilterAction, public ImageAnnotationAction
-{
-public:
-    void load() override
-    {
-        ImageFilterAction::load();
-    }
-    void save(bool img = true, bool annotation = true)
-    {
-        if (img) ImageFilterAction::save();
-        if (annotation) ImageAnnotationAction::save();
-    }
-protected:
-    ArgParser _parse(std::initializer_list<Handler*> handlers) override
-    {
-        auto parser = ImageFilterAction::_parse(handlers);
-        marker_out = parser.output(1);
-        return parser;
-    }
-};
+//class ImageFilterAnnotationAction: public ImageFilterAction, public ImageAnnotationAction
+//{
+//public:
+//    void load() override
+//    {
+//        ImageFilterAction::load();
+//    }
+//    void save(bool img = true, bool annotation = true)
+//    {
+//        if (img) ImageFilterAction::save();
+//        if (annotation) ImageAnnotationAction::save();
+//    }
+//protected:
+//    ArgParser _parse(std::initializer_list<Handler*> handlers) override
+//    {
+//        auto parser = ImageFilterAction::_parse(handlers);
+//        marker_out = parser.output(1);
+//        return parser;
+//    }
+//};
 
 
 #endif // ABSTRACT_ACTIONS_H

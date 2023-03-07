@@ -18,4 +18,43 @@ inline void export_marker(const QString& path, const QList<LocationSimple>& mark
     file.close();
 }
 
+
+inline QList<LocationSimple> import_marker(const QString& path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        throw "Marker file reading failed!";
+    QTextStream in(&file);
+    QList<LocationSimple> marker_list;
+    while (!in.atEnd())
+    {
+        auto line_str = in.readLine();
+        if (line_str[0]=='#' || line_str[0]=='x' || line_str[0]=='X' || line_str[0]=='\0') continue;
+
+        QStringList qsl = line_str.trimmed().split(",");
+        int qsl_count=qsl.size();
+        if (qsl_count<3)   continue;
+
+        LocationSimple S;
+
+        S.x = qsl[0].toFloat();
+        S.y = qsl[1].toFloat();
+        S.z = qsl[2].toFloat();
+        S.radius = (qsl_count>=4) ? qsl[3].toInt() : 0;
+        S.name = (qsl_count>=6) ? qPrintable(qsl[5].trimmed()) : "";
+        S.comments = (qsl_count>=7) ? qPrintable(qsl[6].trimmed()) : "";
+
+        S.color = random_rgba8(255);
+        if (qsl_count>=8) S.color.r = qsl[7].toUInt();
+        if (qsl_count>=9) S.color.g = qsl[8].toUInt();
+        if (qsl_count>=10) S.color.b = qsl[9].toUInt();
+
+        S.on = true; //listLoc[i].on;        //true;
+
+        marker_list.append(S);
+    }
+    file.close();
+    return marker_list;
+}
+
 #endif // UTILS_H
