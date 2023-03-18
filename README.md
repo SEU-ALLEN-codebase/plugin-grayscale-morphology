@@ -31,6 +31,8 @@ A typical problem caused by this filter is that the soma becomes more hollow and
 
 PLEASE INPUT 16BIT RAW IMAGES FOR BETTER RESULTS. This denoising plugin is aimed at extracting the high frequency textures that can be neuron fibers, but images converted down to 8bit have already lost a lot of them. Also, enhancing techniques preceding this can lead to unpredictable results, since some artifacts can also be enhanced and exceed the capability of this plugin.
 
+
+
 ### UI
 
 The function of denoising, blurring, max downsampling and the integrated filter are provided and their panels share the parameters with CLI.
@@ -44,6 +46,7 @@ The function of denoising, blurring, max downsampling and the integrated filter 
 * **max_ds**: downsample to merge the gap between signals induced by previous steps. Optional for reconstruction algorithms that allow small gaps.
 * **integrated_filter**: execute the above procedures sequentially, i.e. denoise -> blur -> max_ds
 * **guo_enh**: Guo's image enhancement.
+* **search_soma**: search soma by meanshift and finding maxima in GSDT.
 
 
 
@@ -67,5 +70,9 @@ vaa3d -x neuron_image_rectify -f integrated_filter -i in.tif -o out.tif out.mark
 # Guo's image inhancement
 v3d -x neuron_image_denoise -f guo_enh -i in.tif -o out.tif -p \
 	enh_sigma 1,1,0.25 color_sigma 35 gain 5 cutoff 25 bilateral true fft true
+
+# soma search
+v3d -x neuron_image_denoise -f search_soma -i in.tif in.marker -o out.marker -p 
+	soma_radius 4,4,4 sigma 5,5,5 bg_thr 0 z_thickness 1 cnn_type 3 test_count 10
 ```
 

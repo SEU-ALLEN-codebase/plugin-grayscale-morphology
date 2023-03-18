@@ -29,6 +29,7 @@ QStringList NeuronImageDenoise::funclist() const
             << tr("blur")
             << tr("max_ds")
             << tr("guo_enh")
+            << tr("search_soma")
             << tr("help");
 }
 

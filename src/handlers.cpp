@@ -309,32 +309,57 @@ void SomaSearch::operator()(const MyImage& img, QVector3D& soma) const
         fastmarching_dt((v3d_float32*)src, (v3d_float32*)dst, img.sz, cnn_type, bg_thr, z_thickness);
         break;
     default:
-        throw "MeanshiftSomaRefinement: Invalid datatype.";
+        throw "SomaSearch: Invalid datatype.";
     }
 
     V3DLONG count = 0;
     float center_dist = 1;
+    auto&& search_radius = sigma * 3;
+    auto&& s2 = sigma * sigma;
     while (center_dist >= .5 && count < test_count)
     {
+        float weight = 0;
+        QVector3D total = {0, 0, 0};
         ++count;
-        const auto& start = soma - win_radius;
-        const auto& end = soma + win_radius;
+        const auto& start = soma - search_radius;
+        const auto& end = soma + search_radius;
         const auto xs = max(0l, lround(start[0]));
         const auto ys = max(0l, lround(start[1]));
         const auto zs = max(0l, lround(start[2]));
         const auto xe = min(lround(end[0]) + 1, gsdt.sz[0]);
         const auto ye = min(lround(end[1]) + 1, gsdt.sz[1]);
         const auto ze = min(lround(end[2]) + 1, gsdt.sz[2]);
-
-        auto new_center = soma;
         for(V3DLONG x = xs; x < xe; ++x)
             for(V3DLONG y = ys; y < ye; ++y)
                 for(V3DLONG z = zs; z < ze; ++z)
                 {
-                    if (gsdt.at(x, y, z) > gsdt.at(new_center[0], new_center[1], new_center[2]))
-                        new_center = QVector3D(x, y, z);
+                    QVector3D coord(x, y, z);
+                    auto&& shift = coord - soma;
+                    auto&& w = exp(QVector3D::dotProduct(shift / s2, {.5, .5, .5})) * gsdt.at(x, y, z);
+                    total += w * coord;
+                    weight += w;
                 }
+        if (total.length() < 1e-5)
+            break;
+        const auto& new_center = total / weight;
         center_dist = (new_center - soma).length();
         soma = new_center;
+    }
+    {
+        const auto& start = soma - soma_radius;
+        const auto& end = soma + soma_radius;
+        const auto xs = max(0l, lround(start[0]));
+        const auto ys = max(0l, lround(start[1]));
+        const auto zs = max(0l, lround(start[2]));
+        const auto xe = min(lround(end[0]) + 1, gsdt.sz[0]);
+        const auto ye = min(lround(end[1]) + 1, gsdt.sz[1]);
+        const auto ze = min(lround(end[2]) + 1, gsdt.sz[2]);
+        for(V3DLONG x = xs; x < xe; ++x)
+            for(V3DLONG y = ys; y < ye; ++y)
+                for(V3DLONG z = zs; z < ze; ++z)
+                {
+                    if (gsdt.at(x, y, z) > gsdt.at(soma[0], soma[1], soma[2]))
+                        soma = QVector3D(x, y, z);
+                }
     }
 }
